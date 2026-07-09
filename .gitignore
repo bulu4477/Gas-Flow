@@ -1,0 +1,71 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# Hardhat
+artifacts/
+cache/
+cache_hardhat/
+typechain/
+typechain-types/
+**/artifacts/
+**/cache/
+**/cache_hardhat/
+**/typechain/
+**/typechain-types/
+
+# Foundry
+out/
+forge-cache/
+broadcast/
+**/out/
+**/forge-cache/
+**/broadcast/
+
+# Hardhat deployments and local upgrade manifests
+deployments/
+.openzeppelin/
+**/deployments/
+**/.openzeppelin/
+
+# Local project/agent state
+.sisyphus/
+**/.sisyphus/
+
+# Logs and reports
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+lcov.info
+gas-reports/
+**/coverage/
+**/gas-reports/
+
+# Local relayer notes/debug scripts
+relayer/ARCHITECTURE.md
+relayer/scripts/debug-*
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
