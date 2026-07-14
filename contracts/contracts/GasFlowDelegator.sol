@@ -28,6 +28,7 @@ interface AggregatorV3Interface {
 
 interface IGasFlowConfig {
     function stakePool() external view returns (address);
+    function relayers(address relayer) external view returns (bool);
     function l1FeeBps() external view returns (uint256);
     function priceFeeds(address token) external view returns (address ethUsdFeed, address tokenUsdFeed);
     function feeTokenDecimals(address token) external view returns (uint8);
@@ -125,7 +126,8 @@ contract GasFlowDelegator is ReentrancyGuardTransient {
         address feeToken,
         uint256 maxFeeAmount,
         uint256 authGasOverhead,
-        uint256 deadline
+        uint256 deadline,
+        address sender
     ) internal view {
         bytes32 digest = keccak256(
             abi.encode(
@@ -135,7 +137,8 @@ contract GasFlowDelegator is ReentrancyGuardTransient {
                 feeToken,
                 maxFeeAmount,
                 authGasOverhead,
-                deadline
+                deadline,
+                sender
             )
         );
         address recovered = ECDSA.recover(digest.toEthSignedMessageHash(), signature);
@@ -215,6 +218,7 @@ contract GasFlowDelegator is ReentrancyGuardTransient {
     ) external payable nonReentrant {
         // ── Step 1: Start gas metering at the very beginning ──
         uint256 gasStart = gasleft();
+        require(config.relayers(msg.sender), "Delegator: not relayer");
         require(calls.length <= MAX_BATCH_SIZE, "Delegator: batch too large");
         require(block.timestamp <= deadline, "Delegator: expired");
         uint256 totalCallValue;
@@ -232,7 +236,7 @@ contract GasFlowDelegator is ReentrancyGuardTransient {
         require(ethUsdFeed != address(0), "Delegator: unsupported fee token");
 
         // ── Step 2: Verify ECDSA signature ──
-        _verifySignature(calls, signature, feeToken, maxFeeAmount, authGasOverhead, deadline);
+        _verifySignature(calls, signature, feeToken, maxFeeAmount, authGasOverhead, deadline, msg.sender);
 
         // ── Step 3: Execute batch ──
         uint256 currentNonce = nonce();

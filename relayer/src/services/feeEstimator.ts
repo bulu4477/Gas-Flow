@@ -13,6 +13,7 @@ import {
   readConfig,
   readChainlinkPrice,
   getPublicClient,
+  getRelayerAddress,
 } from "./clients";
 import { nonceManager } from "./nonceManager";
 import { withRetry } from "../utils/retry";
@@ -163,6 +164,7 @@ export async function estimateFee(
     (feeWithMarkup * config.feeAmountMarginBps) / 10_000n;
 
   const deadline = BigInt(Math.floor(Date.now() / 1000) + ESTIMATE_DEADLINE_SECONDS);
+  const relayerAddress = getRelayerAddress();
 
   const rawDigest = keccak256(
     encodeAbiParameters(
@@ -181,8 +183,9 @@ export async function estimateFee(
         { type: "uint256" },
         { type: "uint256" },
         { type: "uint256" },
+        { type: "address" },
       ],
-      [BigInt(config.chainId), nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline],
+      [BigInt(config.chainId), nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline, relayerAddress],
     ),
   );
 
@@ -195,6 +198,7 @@ export async function estimateFee(
     feeTokenDecimals,
     configAddress: config.configAddress,
     deadline,
+    relayerAddress,
     rawDigest,
     ethSignedDigest: hashMessage({ raw: rawDigest }),
   };

@@ -192,6 +192,7 @@ function hashBatch(
   maxFeeAmount: bigint,
   authGasOverhead: bigint,
   deadline: bigint,
+  relayerAddress: Address,
 ): Hex {
   return keccak256(
     encodeAbiParameters(
@@ -210,8 +211,9 @@ function hashBatch(
         { type: "uint256" },
         { type: "uint256" },
         { type: "uint256" },
+        { type: "address" },
       ],
-      [BigInt(chainId), nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline],
+      [BigInt(chainId), nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline, relayerAddress],
     ),
   );
 }
@@ -226,7 +228,7 @@ export async function verifySignature(
   deadline: bigint,
   signature: Hex,
 ): Promise<boolean> {
-  const digest = hashBatch(config.chainId, nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline);
+  const digest = hashBatch(config.chainId, nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline, getRelayerAddress());
   const recovered = await recoverMessageAddress({
     message: { raw: digest },
     signature,

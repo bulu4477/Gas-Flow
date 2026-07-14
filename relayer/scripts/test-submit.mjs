@@ -100,7 +100,7 @@ async function getJSON(path) {
   return json;
 }
 
-function computeBatchDigest(chainId, nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline) {
+function computeBatchDigest(chainId, nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline, relayerAddress) {
   return keccak256(
     encodeAbiParameters(
       [
@@ -118,8 +118,9 @@ function computeBatchDigest(chainId, nonce, calls, feeToken, maxFeeAmount, authG
         { type: "uint256" },
         { type: "uint256" },
         { type: "uint256" },
+        { type: "address" },
       ],
-      [BigInt(chainId), nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline],
+      [BigInt(chainId), nonce, calls, feeToken, maxFeeAmount, authGasOverhead, deadline, relayerAddress],
     ),
   );
 }
@@ -174,6 +175,7 @@ async function main() {
   console.log(`  rawDigest:       ${estimate.rawDigest}`);
   console.log(`  ethSignedDigest: ${estimate.ethSignedDigest}`);
   console.log(`  deadline:        ${estimate.deadline}`);
+  console.log(`  relayerAddress:  ${estimate.relayerAddress}`);
 
   if (BigInt(estimate.nonce) !== currentNonce) {
     console.warn(`  ⚠️ relayer 返回的 nonce 与本地不同: ${estimate.nonce} ≠ ${currentNonce}`);
@@ -186,6 +188,7 @@ async function main() {
     BigInt(estimate.maxFeeAmount),
     BigInt(estimate.authGasOverhead),
     BigInt(estimate.deadline),
+    estimate.relayerAddress,
   );
   if (estimate.rawDigest !== localDigest) {
     console.error(`  ❌ digest 不匹配! 本地: ${localDigest} Relayer: ${estimate.rawDigest}`);

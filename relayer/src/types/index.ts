@@ -51,6 +51,7 @@ export interface EstimateResponse {
   feeTokenDecimals: number;
   configAddress: Address;
   deadline: bigint;
+  relayerAddress: Address;
   rawDigest: Hex;
   ethSignedDigest: Hex;
 }
