@@ -18,12 +18,13 @@ import { nonceManager } from "./nonceManager";
 import { withRetry } from "../utils/retry";
 
 const BASE_TX_GAS = 21_000n;
-const POST_FEE_OVERHEAD = 135_000n;
+const POST_FEE_OVERHEAD = 150_000n;
 const DELEGATOR_EXECUTION_OVERHEAD = 55_000n;
 const PER_CALL_OVERHEAD = 5_000n;
 const SINGLE_CALL_FALLBACK_GAS = 50_000n;
 const SIMULATION_BALANCE = parseEther("1000");
 const ESTIMATE_DEADLINE_SECONDS = 15 * 60;
+const GAS_PRICE_ESTIMATE_MARGIN_BPS = 11_000n;
 
 async function estimateGasForCalls(
   user: Address,
@@ -71,6 +72,30 @@ async function estimateGasForCalls(
 const EMPTY_ACCOUNT_AUTH_GAS = 37_500n;
 const SWITCH_DELEGATION_AUTH_GAS = 25_000n;
 
+async function estimateTxGasPrice(): Promise<bigint> {
+  const publicClient = getPublicClient();
+
+  try {
+    const [fees, block] = await Promise.all([
+      publicClient.estimateFeesPerGas(),
+      publicClient.getBlock(),
+    ]);
+
+    if (block.baseFeePerGas !== null && fees.maxPriorityFeePerGas) {
+      const expectedEffectiveGasPrice = block.baseFeePerGas + fees.maxPriorityFeePerGas;
+      return (expectedEffectiveGasPrice * GAS_PRICE_ESTIMATE_MARGIN_BPS) / 10_000n;
+    }
+
+    if (fees.maxFeePerGas) {
+      return (fees.maxFeePerGas * GAS_PRICE_ESTIMATE_MARGIN_BPS) / 10_000n;
+    }
+  } catch {
+    // Fall back to legacy gasPrice below.
+  }
+
+  const gasPrice = await publicClient.getGasPrice();
+  return (gasPrice * GAS_PRICE_ESTIMATE_MARGIN_BPS) / 10_000n;
+}
 async function estimateAuthGasOverhead(user: Address): Promise<bigint> {
   const isDelegatedToUs = await checkDelegationStatus(user);
   if (isDelegatedToUs) return 0n;
@@ -122,7 +147,7 @@ export async function estimateFee(
 
   const feeTokenDecimals = await readConfig.feeTokenDecimals(feeToken);
 
-  const gasPrice = await getPublicClient().getGasPrice();
+  const gasPrice = await estimateTxGasPrice();
   const totalGas = gasEstimate + authGasOverhead;
   const totalCallValue = calls.reduce((sum, call) => sum + call.value, 0n);
   const ethCompensation =
