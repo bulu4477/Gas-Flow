@@ -24,6 +24,7 @@ export const config = {
   rpcUrl: requireEnv("RPC_URL"),
   chainId: Number(requireEnv("CHAIN_ID")),
   port: Number(process.env.PORT || "3000"),
+  logLevel: process.env.LOG_LEVEL || "info",
 
   relayerApiKey: process.env.RELAYER_API_KEY,
   maxBodySize: Number(process.env.MAX_BODY_SIZE || "1048576"),

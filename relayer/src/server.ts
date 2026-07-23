@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import http from "node:http";
 import { config } from "./config";
 import { handleSubmit } from "./routes/submit";
@@ -9,7 +10,7 @@ import { runStartupChecks } from "./services/startupCheck";
 import { startBalanceMonitor } from "./services/balanceMonitor";
 import { getRelayerAddress, getPublicClient, readConfig } from "./services/clients";
 import { nonceManager } from "./services/nonceManager";
-import { logger } from "./utils/logger";
+import { logger, withRequestLogContext } from "./utils/logger";
 import { metrics } from "./utils/metrics";
 import {
   READ_BODY_TIMEOUT_MS,
@@ -113,15 +114,26 @@ function jsonResponse(
   statusCode: number,
   body: unknown,
 ) {
+  if (!res.hasHeader("X-Request-Id")) {
+    res.setHeader("X-Request-Id", "unknown");
+  }
+  const requestId = String(res.getHeader("X-Request-Id") ?? "unknown");
+  const responseBody =
+    body &&
+    typeof body === "object" &&
+    "error" in body &&
+    !("requestId" in body)
+      ? { ...(body as Record<string, unknown>), requestId }
+      : body;
   res.writeHead(statusCode, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
+    "Access-Control-Allow-Headers": "Content-Type, X-API-Key, X-Request-Id",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
   });
-  res.end(JSON.stringify(body, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
+  res.end(JSON.stringify(responseBody, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
 }
 
 async function handleHealth(res: http.ServerResponse): Promise<void> {
@@ -161,17 +173,34 @@ function handleMetrics(res: http.ServerResponse): void {
   });
 }
 
-async function handleRequest(
+function getRequestId(req: http.IncomingMessage): string {
+  const provided = req.headers["x-request-id"];
+  if (typeof provided === "string" && provided.trim().length > 0) {
+    return provided.trim().slice(0, 128);
+  }
+  return crypto.randomUUID();
+}
+
+async function handleRequestInner(
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> {
+  const startedAt = Date.now();
+  const finishLog = () => {
+    logger.info("Request completed", {
+      statusCode: res.statusCode,
+      durationMs: Date.now() - startedAt,
+    });
+  };
+  res.once("finish", finishLog);
+
   logger.info("Incoming request", { method: req.method, url: req.url });
 
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
+      "Access-Control-Allow-Headers": "Content-Type, X-API-Key, X-Request-Id",
       "X-Content-Type-Options": "nosniff",
       "X-Frame-Options": "DENY",
     });
@@ -311,6 +340,26 @@ async function handleRequest(
   jsonResponse(res, 404, { error: "Not found" });
 }
 
+async function handleRequest(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): Promise<void> {
+  const requestId = getRequestId(req);
+  const clientIp = getClientIp(req);
+  const path = req.url?.split("?")[0] ?? "/";
+  res.setHeader("X-Request-Id", requestId);
+
+  return withRequestLogContext(
+    {
+      requestId,
+      method: req.method,
+      path,
+      clientIp,
+    },
+    () => handleRequestInner(req, res),
+  );
+}
+
 function createServer(): http.Server {
   return http.createServer(handleRequest);
 }
@@ -349,6 +398,7 @@ export async function start(): Promise<void> {
   server.listen(config.port, () => {
     logger.info("GasFlow Relayer started", {
       port: config.port,
+      logLevel: config.logLevel,
       relayerAddress: getRelayerAddress(),
     });
 
