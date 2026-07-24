@@ -18,7 +18,8 @@ import { logger } from "../utils/logger";
 import { metrics } from "../utils/metrics";
 
 export const PLACEHOLDER_SIG = ("0x" + "00".repeat(65)) as Hex;
-const SIMULATION_BALANCE = parseEther("1000");
+const SIMULATION_BALANCE = parseEther( "1000" );
+const SIMULATION_GAS_LIMIT = 2_000_000n;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -115,6 +116,7 @@ export async function simulateTransaction(
               authorizationList,
               account: relayer,
               stateOverride: simulationStateOverride,
+              gas: SIMULATION_GAS_LIMIT,
             }),
           config.simulationTimeoutMs,
         ),
@@ -131,6 +133,7 @@ export async function simulateTransaction(
             authorizationList,
             account: relayer,
             stateOverride: simulationStateOverride,
+            gas: SIMULATION_GAS_LIMIT,
           }),
           config.simulationTimeoutMs,
         ),
